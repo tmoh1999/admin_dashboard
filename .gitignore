@@ -1,0 +1,5 @@
+# Ignore all __pycache__ folders
+__pycache__/
+*.py[cod]  # optional: also ignore compiled Python files
+*.env
+venv/
