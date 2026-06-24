@@ -3,3 +3,4 @@ __pycache__/
 *.py[cod]  # optional: also ignore compiled Python files
 *.env
 venv/
+postgres_commands.md
