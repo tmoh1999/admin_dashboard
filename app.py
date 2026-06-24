@@ -21,13 +21,14 @@ def create_app(test_config=None):
 
     if test_config:
         app.config.update(test_config)
+
+    db.init_app(app)        
     migrate.init_app(app,db)
-    db.init_app(app)
+    
     return app
 
 app = create_app()
-with app.app_context():
-    db.create_all()
+
 
 @app.route("/")
 def home():
