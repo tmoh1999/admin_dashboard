@@ -6,6 +6,10 @@ from flask import Flask,jsonify
 from flask_cors import CORS
 from flask_migrate import Migrate
 from models import User,db
+from blueprints import auth_bp
+from flask_jwt_extended import JWTManager
+from extensions import limiter
+jwt = JWTManager()
 migrate= Migrate()
 def create_app(test_config=None):
     app = Flask(__name__)
@@ -18,13 +22,23 @@ def create_app(test_config=None):
     app.secret_key = os.environ.get("SECRET_KEY")
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY")
 
     if test_config:
         app.config.update(test_config)
 
-    db.init_app(app)        
+    db.init_app(app)  
+    jwt.init_app(app)      
     migrate.init_app(app,db)
+    limiter.init_app(app)      
+    app.register_blueprint(auth_bp)
     
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        return jsonify({
+            "error": "Too many requests"
+        }), 429
+
     return app
 
 app = create_app()
