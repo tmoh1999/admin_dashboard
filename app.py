@@ -8,9 +8,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from models import db
 from blueprints import auth_bp
-from flask_jwt_extended import JWTManager
-from extensions import limiter
-jwt = JWTManager()
+from extensions import limiter, jwt
 migrate= Migrate()
 def create_app(test_config=None):
     app = Flask(__name__)
@@ -26,6 +24,8 @@ def create_app(test_config=None):
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY")
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=10)
     app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=30)
+    app.config["JWT_BLOCKLIST_ENABLED"] = True
+    app.config["JWT_BLOCKLIST_TOKEN_CHECKS"] = ["access", "refresh"]
 
     if test_config:
         app.config.update(test_config)

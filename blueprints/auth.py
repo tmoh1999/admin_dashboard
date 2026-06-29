@@ -1,14 +1,20 @@
 from flask import Blueprint, request, jsonify
 from models import User, db
-from extensions import limiter
+from extensions import limiter, jwt
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
+    get_jwt,
     get_jwt_identity,
     jwt_required,
 )
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
+revoked_tokens = set()
+
+@jwt.token_in_blocklist_loader
+def check_if_token_revoked(jwt_header, jwt_payload):
+    return jwt_payload["jti"] in revoked_tokens
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
@@ -78,6 +84,14 @@ def login():
         "access_token": access_token,
         "refresh_token": refresh_token,
         "user": {"id": user.id, "username": user.username}
+    }), 200
+
+@auth_bp.route("/logout", methods=["POST"])
+@jwt_required()
+def logout():
+    revoked_tokens.add(get_jwt()["jti"])
+    return jsonify({
+        "message": "Logout successful!"
     }), 200
 
 @auth_bp.route("/refresh", methods=["POST"])
