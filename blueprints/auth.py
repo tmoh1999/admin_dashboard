@@ -88,3 +88,11 @@ def refresh_token():
     return jsonify({
         "access_token": new_access_token
     }), 200
+
+@auth_bp.route("/test")
+@jwt_required()
+def test():
+    user=get_jwt_identity()
+    return jsonify({
+        "success":True,
+    })
