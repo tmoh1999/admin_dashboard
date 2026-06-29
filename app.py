@@ -2,10 +2,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
-from flask import Flask,jsonify
+from datetime import timedelta
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_migrate import Migrate
-from models import User,db
+from models import db
 from blueprints import auth_bp
 from flask_jwt_extended import JWTManager
 from extensions import limiter
@@ -23,6 +24,8 @@ def create_app(test_config=None):
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY")
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=120)
+    app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=30)
 
     if test_config:
         app.config.update(test_config)

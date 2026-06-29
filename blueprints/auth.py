@@ -1,10 +1,13 @@
-from flask import Blueprint, request,jsonify
-from models import User,db
-import os
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Blueprint, request, jsonify
+from models import User, db
 from extensions import limiter
-from datetime import timedelta
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import (
+    create_access_token,
+    create_refresh_token,
+    get_jwt_identity,
+    jwt_required,
+)
+
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 @auth_bp.route("/register", methods=["POST"])
@@ -30,21 +33,18 @@ def register():
         return jsonify({"error": "Username or email already exists"}), 400
 
     # Hash password and create user
-    new_user = User(username=username,email=email)
+    new_user = User(username=username, email=email)
     new_user.set_password(password)
     db.session.add(new_user)
     db.session.commit()
 
-    # Generate JWT token
+    access_token = create_access_token(identity=new_user.id)
+    refresh_token = create_refresh_token(identity=new_user.id)
 
-    access_token = create_access_token(
-        identity=new_user.id,
-        expires_delta=timedelta(minutes=120)
-    )
-    # Return success JSON with token
     return jsonify({
         "message": "Registration successful!",
-        "token": access_token,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
         "user": {"id": new_user.id, "username": new_user.username}
     }), 201
     
@@ -70,14 +70,21 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid username or password"}), 401
 
-    # Generate JWT token
-    access_token = create_access_token(
-        identity=user.id,
-        expires_delta=timedelta(minutes=120)
-    )
-    # Return success JSON with token
+    access_token = create_access_token(identity=user.id)
+    refresh_token = create_refresh_token(identity=user.id)
+
     return jsonify({
         "message": "Login successful!",
-        "token": access_token,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
         "user": {"id": user.id, "username": user.username}
+    }), 200
+
+@auth_bp.route("/refresh", methods=["POST"])
+@jwt_required(refresh=True)
+def refresh_token():
+    current_user = get_jwt_identity()
+    new_access_token = create_access_token(identity=current_user)
+    return jsonify({
+        "access_token": new_access_token
     }), 200
