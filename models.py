@@ -4,6 +4,7 @@ from sqlalchemy.orm import validates
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 db = SQLAlchemy()
 
@@ -24,6 +25,8 @@ class User(db.Model):
     email = db.Column(db.String(120), nullable=False)
 
     password_hash = db.Column(db.String(255), nullable=False)
+
+    is_email_verified = db.Column(db.Boolean, nullable=False, default=False)
 
     role = db.Column(
         db.Enum(UserRole),
@@ -70,6 +73,19 @@ class User(db.Model):
             raise ValueError("Username cannot be empty")
         return value.strip()
 
+    def generate_email_verification_token(self, secret_key, salt):
+        serializer = URLSafeTimedSerializer(secret_key, salt=salt)
+        return serializer.dumps({"user_id": self.id})
+
+    @staticmethod
+    def verify_email_verification_token(token, secret_key, salt, max_age=3600):
+        serializer = URLSafeTimedSerializer(secret_key, salt=salt)
+        try:
+            data = serializer.loads(token, max_age=max_age)
+        except (SignatureExpired, BadSignature):
+            return None
+        return data.get("user_id")
+
     # ------------------------------------------------------------------ #
     #  password helpers                                                    #
     # ------------------------------------------------------------------ #
@@ -90,13 +106,14 @@ class User(db.Model):
 
     def to_dict(self):
         return {
-            "id":         self.id,
-            "username":   self.username,
-            "email":      self.email,
-            "role":       self.role.value,
-            "is_active":  self.is_active,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "id":               self.id,
+            "username":         self.username,
+            "email":            self.email,
+            "role":             self.role.value,
+            "is_active":        self.is_active,
+            "is_email_verified": self.is_email_verified,
+            "created_at":       self.created_at.isoformat() if self.created_at else None,
+            "updated_at":       self.updated_at.isoformat() if self.updated_at else None,
         }
 
     def __repr__(self):
