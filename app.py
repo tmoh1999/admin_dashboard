@@ -32,6 +32,10 @@ def create_app(test_config=None):
         "EMAIL_VERIFICATION_URL",
         "http://localhost:5000/api/auth/verify-email/{token}"
     )
+    app.config["EMAIL_RESET_PASSWORD_URL"] = os.environ.get(
+        "EMAIL_RESET_PASSWORD_URL",
+        "http://localhost:5000/api/auth/reset-password/{token}"
+    )
     app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
     app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", 587))
     app.config["MAIL_USE_TLS"] = os.environ.get("MAIL_USE_TLS", "False").lower() == "true"

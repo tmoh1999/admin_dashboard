@@ -28,6 +28,19 @@ def send_verification_email(user, verification_url):
     )
     mail.send(message)
 
+def send_password_reset_verification_email(user, verification_url):
+    message = Message(
+        subject="Reset your password for Admin Dashboard",
+        sender=current_app.config["MAIL_DEFAULT_SENDER"],
+        recipients=[user.email],
+        body=(
+            f"Hello {user.username},\n\n"
+            f"You requested a password reset. Please reset your password by visiting the link below:\n\n"
+            f"{verification_url}\n\n"
+            "If you did not request a password reset, please ignore this email."
+        ),
+    )
+    mail.send(message)
 @jwt.token_in_blocklist_loader
 def check_if_token_revoked(jwt_header, jwt_payload):
     return jwt_payload["jti"] in revoked_tokens
@@ -112,6 +125,99 @@ def verify_email(token):
     db.session.commit()
 
     return jsonify({"message": "Email verified successfully"}), 200
+
+@auth_bp.route("/reset-password/<token>", methods=["GET"])
+def reset_password_endpoint(token):
+    user_id = User.verify_password_reset_token(
+        token,
+        current_app.config["JWT_SECRET_KEY"],
+        current_app.config["EMAIL_VERIFICATION_SALT"],
+        current_app.config["EMAIL_VERIFICATION_TOKEN_EXPIRES"],
+    )
+    if not user_id:
+        return jsonify({"error": "Invalid or expired verification token"}), 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if not user.is_email_verified:
+        return jsonify({"message": "Email not verified"}), 400
+
+    return jsonify({"message": "Verified: ready to reset password"}), 200
+
+
+@auth_bp.route("/reset-password/<token>", methods=["POST"])
+def reset_password(token):
+    # Accept new password and update user
+    if not request.is_json:
+        return jsonify({"error": "JSON data required"}), 400
+
+    data = request.get_json()
+    new_password = data.get("password")
+    if not new_password:
+        return jsonify({"error": "Password is required"}), 400
+
+    user_id = User.verify_password_reset_token(
+        token,
+        current_app.config["JWT_SECRET_KEY"],
+        current_app.config["EMAIL_VERIFICATION_SALT"],
+        current_app.config["EMAIL_VERIFICATION_TOKEN_EXPIRES"],
+    )
+    if not user_id:
+        return jsonify({"error": "Invalid or expired token"}), 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        user.set_password(new_password)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    db.session.commit()
+    return jsonify({"message": "Password has been reset successfully"}), 200
+
+@auth_bp.route("/password-reset", methods=["POST"])
+def password_reset():       
+    if not request.is_json:
+        return jsonify({"error": "JSON data required"}), 400
+
+    data = request.get_json()
+    email = data.get("email")
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    user = User.query.filter_by(email=email.lower().strip()).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if current_app.config["REQUEST_MAIL_VERIFICATION"] and not user.is_email_verified:
+        return jsonify({"message": "Email not verified"}), 400
+
+    verification_token = user.generate_password_reset_token(
+        current_app.config["JWT_SECRET_KEY"],
+        current_app.config["EMAIL_VERIFICATION_SALT"],
+    )
+    verification_url = current_app.config["EMAIL_RESET_PASSWORD_URL"].format(
+        token=verification_token
+    )
+
+    try:
+        send_password_reset_verification_email(user, verification_url)
+    except Exception as exc:
+        return jsonify({
+            "error": "Failed to send verification email.",
+            "details": str(exc)
+        }), 500
+
+    response = {"message": "Password reset verification email resent."}
+    if current_app.debug:
+        response["verification_url"] = verification_url
+
+    return jsonify(response), 200
+
 
 @auth_bp.route("/resend-verification", methods=["POST"])
 def resend_verification():

@@ -77,12 +77,28 @@ class User(db.Model):
         serializer = URLSafeTimedSerializer(secret_key, salt=salt)
         return serializer.dumps({"user_id": self.id})
 
+    def generate_password_reset_token(self, secret_key, salt):
+        serializer = URLSafeTimedSerializer(secret_key, salt=salt)
+        return serializer.dumps({"user_id": self.id, "type": "password-reset"})
+
     @staticmethod
     def verify_email_verification_token(token, secret_key, salt, max_age=3600):
         serializer = URLSafeTimedSerializer(secret_key, salt=salt)
         try:
             data = serializer.loads(token, max_age=max_age)
         except (SignatureExpired, BadSignature):
+            return None
+        return data.get("user_id")
+
+    @staticmethod
+    def verify_password_reset_token(token, secret_key, salt, max_age=3600):
+        serializer = URLSafeTimedSerializer(secret_key, salt=salt)
+        try:
+            data = serializer.loads(token, max_age=max_age)
+        except (SignatureExpired, BadSignature):
+            return None
+        # ensure token type matches
+        if data.get("type") != "password-reset":
             return None
         return data.get("user_id")
 
