@@ -7,7 +7,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_migrate import Migrate
 from models import db
-from blueprints import auth_bp
+from blueprints import auth_bp,users_bp
 from extensions import limiter, jwt, mail
 migrate = Migrate()
 def create_app(test_config=None):
@@ -54,7 +54,7 @@ def create_app(test_config=None):
     migrate.init_app(app,db)
     limiter.init_app(app)      
     app.register_blueprint(auth_bp)
-    
+    app.register_blueprint(users_bp)
     @app.errorhandler(429)
     def ratelimit_handler(e):
         return jsonify({
