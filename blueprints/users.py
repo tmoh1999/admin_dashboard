@@ -15,7 +15,7 @@ users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 def get_current_user():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
-    if not user:
+    if not user or not user.is_active:
         return jsonify({"error": "User not found"}), 404
 
     return jsonify({
@@ -38,12 +38,12 @@ def send_verification_new_email(user, verification_url):
     )
     mail.send(message)
 
-@users_bp.route('/edit', methods=['PUT'])
+@users_bp.route('/me', methods=['PUT'])
 @jwt_required()
 def edit_user():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
-    if not user:
+    if not user or not user.is_active:
         return jsonify({"error": "User not found"}), 404
 
     data = request.get_json()
@@ -108,3 +108,16 @@ def edit_user():
         "pending_email": user.pending_email,
         "is_active": user.is_active,
     }), 200
+
+@users_bp.route('/me', methods=['DELETE'])
+@jwt_required()
+def delete_current_user():
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    if not user or not user.is_active:
+        return jsonify({"error": "User not found"}), 404
+
+    user.is_active = False
+    db.session.commit()
+
+    return jsonify({"message": "User archived successfully."}), 200
