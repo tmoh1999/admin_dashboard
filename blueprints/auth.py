@@ -71,13 +71,17 @@ def register():
     new_user = User(username=username, email=email)
     new_user.set_password(password)
     db.session.add(new_user)
-    db.session.commit()
 
     if not current_app.config["REQUEST_MAIL_VERIFICATION"]:
+        new_user.is_email_verified = True
+        new_user.pending_email = None
+        db.session.commit()
         return jsonify({
-            "message": "Registration successful!.",
+            "message": "Registration successful!",
             "user": {"id": new_user.id, "username": new_user.username}
-        }), 201        
+        }), 201
+
+    db.session.commit()
     verification_token = new_user.generate_email_verification_token(
         current_app.config["JWT_SECRET_KEY"],
         current_app.config["EMAIL_VERIFICATION_SALT"],
@@ -118,8 +122,12 @@ def verify_email(token):
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    if user.is_email_verified:
+    if user.is_email_verified and not user.pending_email:
         return jsonify({"message": "Email already verified"}), 200
+
+    if user.pending_email:
+        user.email = user.pending_email
+        user.pending_email = None
 
     user.is_email_verified = True
     db.session.commit()
@@ -237,7 +245,7 @@ def resend_verification():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    if user.is_email_verified:
+    if user.is_email_verified and not user.pending_email:
         return jsonify({"message": "Email already verified"}), 200
 
     verification_token = user.generate_email_verification_token(
@@ -249,7 +257,21 @@ def resend_verification():
     )
 
     try:
-        send_verification_email(user, verification_url)
+        if user.pending_email:
+            message = Message(
+                subject="Verify your new email for Admin Dashboard",
+                sender=current_app.config["MAIL_DEFAULT_SENDER"],
+                recipients=[user.pending_email],
+                body=(
+                    f"Hello {user.username},\n\n"
+                    f"Please verify your new email by visiting the link below:\n\n"
+                    f"{verification_url}\n\n"
+                    "If you did not change your email address, please ignore this email."
+                ),
+            )
+            mail.send(message)
+        else:
+            send_verification_email(user, verification_url)
     except Exception as exc:
         return jsonify({
             "error": "Failed to send verification email.",
@@ -274,15 +296,15 @@ def login():
     password = data.get("password")
 
     if not login or not password:
-        return jsonify({"error": "Username and password required"}), 400
+        return jsonify({"error": "login and password required"}), 400
 
     # Find user in DB
     user:User = User.query.filter(
         (User.username==login) |
-        (User.email==login)
+        (User.email==login.strip().lower())
     ).first()
     if not user or not user.check_password(password):
-        return jsonify({"error": "Invalid username or password"}), 401
+        return jsonify({"error": "Invalid login or password"}), 401
 
     if current_app.config["REQUEST_MAIL_VERIFICATION"] and not user.is_email_verified:
         return jsonify({"error": "Email address not verified"}), 403
