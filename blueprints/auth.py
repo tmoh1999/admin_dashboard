@@ -14,6 +14,20 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 revoked_tokens = set()
 
 
+def get_active_user_by_id(user_id):
+    user = User.query.get(user_id)
+    if not user or not user.is_active:
+        return None
+    return user
+
+
+def get_active_user_by_email(email):
+    if not email:
+        return None
+    user = User.query.filter_by(email=email.lower().strip(), is_active=True).first()
+    return user
+
+
 def send_verification_email(user, verification_url):
     message = Message(
         subject="Verify your email for Admin Dashboard",
@@ -118,7 +132,7 @@ def verify_email(token):
     if not user_id:
         return jsonify({"error": "Invalid or expired verification token"}), 400
 
-    user = User.query.get(user_id)
+    user = get_active_user_by_id(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -145,7 +159,7 @@ def reset_password_endpoint(token):
     if not user_id:
         return jsonify({"error": "Invalid or expired verification token"}), 400
 
-    user = User.query.get(user_id)
+    user = get_active_user_by_id(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -175,7 +189,7 @@ def reset_password(token):
     if not user_id:
         return jsonify({"error": "Invalid or expired token"}), 400
 
-    user = User.query.get(user_id)
+    user = get_active_user_by_id(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -197,7 +211,7 @@ def password_reset():
     if not email:
         return jsonify({"error": "Email is required"}), 400
 
-    user = User.query.filter_by(email=email.lower().strip()).first()
+    user = get_active_user_by_email(email)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -241,13 +255,12 @@ def resend_verification():
     if not email:
         return jsonify({"error": "Email is required"}), 400
 
-    user = User.query.filter_by(email=email.lower().strip()).first()
+    user = get_active_user_by_email(email)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
     if user.is_email_verified and not user.pending_email:
         return jsonify({"message": "Email already verified"}), 200
-
     verification_token = user.generate_email_verification_token(
         current_app.config["JWT_SECRET_KEY"],
         current_app.config["EMAIL_VERIFICATION_SALT"],
@@ -303,7 +316,7 @@ def login():
         (User.username==login) |
         (User.email==login.strip().lower())
     ).first()
-    if not user or not user.check_password(password):
+    if not user or not user.is_active or not user.check_password(password):
         return jsonify({"error": "Invalid login or password"}), 401
 
     if current_app.config["REQUEST_MAIL_VERIFICATION"] and not user.is_email_verified:
@@ -322,6 +335,8 @@ def login():
 @auth_bp.route("/logout", methods=["POST"])
 @jwt_required()
 def logout():
+    if not get_active_user_by_id(get_jwt_identity()):
+        return jsonify({"error": "User not found"}), 404
     revoked_tokens.add(get_jwt()["jti"])
     return jsonify({
         "message": "Logout successful!"
@@ -331,6 +346,8 @@ def logout():
 @jwt_required(refresh=True)
 def refresh_token():
     current_user = get_jwt_identity()
+    if not get_active_user_by_id(current_user):
+        return jsonify({"error": "User not found"}), 404
     new_access_token = create_access_token(identity=current_user)
     return jsonify({
         "access_token": new_access_token
@@ -339,7 +356,8 @@ def refresh_token():
 @auth_bp.route("/test")
 @jwt_required()
 def test():
-    user=get_jwt_identity()
+    if not get_active_user_by_id(get_jwt_identity()):
+        return jsonify({"error": "User not found"}), 404
     return jsonify({
         "success":True,
     })
