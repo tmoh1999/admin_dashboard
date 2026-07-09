@@ -24,6 +24,8 @@ class User(db.Model):
 
     email = db.Column(db.String(120), nullable=False)
 
+    pending_email = db.Column(db.String(120), nullable=True)
+
     password_hash = db.Column(db.String(255), nullable=False)
 
     is_email_verified = db.Column(db.Boolean, nullable=False, default=False)
