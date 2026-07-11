@@ -92,7 +92,7 @@ def register():
         db.session.commit()
         return jsonify({
             "message": "Registration successful!",
-            "user": {"id": new_user.id, "username": new_user.username}
+            "user": {"id": new_user.id, "username": new_user.username, "role": new_user.role.value}
         }), 201
 
     db.session.commit()
@@ -114,7 +114,7 @@ def register():
 
     response = {
         "message": "Registration successful! Verification email sent.",
-        "user": {"id": new_user.id, "username": new_user.username}
+        "user": {"id": new_user.id, "username": new_user.username, "role": new_user.role.value},
     }
     if current_app.debug:
         response["verification_url"] = verification_url
@@ -336,7 +336,7 @@ def login():
         "message": "Login successful!",
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "user": {"id": user.id, "username": user.username}
+        "user": {"id": user.id, "username": user.username,"role": user.role.value}
     }), 200
 
 @auth_bp.route("/logout", methods=["POST"])
