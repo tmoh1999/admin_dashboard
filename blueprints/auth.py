@@ -218,6 +218,8 @@ def password_reset():
     if current_app.config["REQUEST_MAIL_VERIFICATION"] and not user.is_email_verified:
         return jsonify({"message": "Email not verified"}), 400
 
+
+
     verification_token = user.generate_password_reset_token(
         current_app.config["JWT_SECRET_KEY"],
         current_app.config["EMAIL_VERIFICATION_SALT"],
@@ -225,6 +227,12 @@ def password_reset():
     verification_url = current_app.config["EMAIL_RESET_PASSWORD_URL"].format(
         token=verification_token
     )
+
+    if not current_app.config["REQUEST_MAIL_VERIFICATION"]:
+        return jsonify({
+            "message": "Email verification is not required",
+            "verification_url": verification_url
+        })
 
     try:
         send_password_reset_verification_email(user, verification_url)
@@ -235,8 +243,7 @@ def password_reset():
         }), 500
 
     response = {"message": "Password reset verification email resent."}
-    if current_app.debug:
-        response["verification_url"] = verification_url
+
 
     return jsonify(response), 200
 
