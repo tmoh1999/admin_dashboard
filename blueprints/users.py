@@ -1,6 +1,7 @@
 from functools import wraps
 
 from flask import Blueprint, request, jsonify, current_app
+from sqlalchemy import String, cast, func
 from models import User, db, UserRole
 from extensions import mail
 from flask_mail import Message
@@ -26,12 +27,71 @@ def admin_required(fn):
     return wrapper
 
 
+def get_users_query():
+    users_query = User.query
+
+    query = request.args.get("search")
+    if query:
+        search = f"%{query.lower()}%"
+        users_query = users_query.filter(
+            func.lower(
+                func.concat(
+                    cast(User.id, String), " ",
+                    cast(User.username, String), " ",
+                    cast(User.email, String), " ",
+                    cast(User.role, String), " ",
+                    cast(User.is_active, String)
+                )
+            ).like(search)
+        )
+
+    sort_column = request.args.get("sort_column", "id")
+    sort_direction = request.args.get("sort_direction", "desc")
+
+    allowed_sort_columns = {
+        "id": User.id,
+        "username": User.username,
+        "email": User.email,
+        "role": User.role,
+        "is_active": User.is_active,
+        "created_at": User.created_at,
+    }
+    column = allowed_sort_columns.get(sort_column, User.id)
+
+    users_query = users_query.order_by(
+        column.asc() if sort_direction == "asc" else column.desc()
+    )
+    return users_query
+
+
 @users_bp.route('', methods=['GET'])
 @admin_required
 def list_users():
-    users = User.query.order_by(User.created_at.desc()).all()
+    page = request.args.get("page", 1, type=int)
+
+    pagination = get_users_query().paginate(
+        page=page,
+        per_page=10,
+        error_out=False,
+    )
+
+    users = pagination.items
+    results_list = [
+        {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role.value if user.role else None,
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        }
+        for user in users
+    ]
+
     return jsonify({
-        "users": [user.to_dict() for user in users]
+        "success": True,
+        "users": results_list,
+        "total_pages": pagination.pages,
     }), 200
 
 
