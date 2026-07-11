@@ -1,5 +1,7 @@
+from functools import wraps
+
 from flask import Blueprint, request, jsonify, current_app
-from models import User, db
+from models import User, db, UserRole
 from extensions import mail
 from flask_mail import Message
 
@@ -9,6 +11,29 @@ from flask_jwt_extended import (
 )
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
+
+
+def admin_required(fn):
+    @wraps(fn)
+    @jwt_required()
+    def wrapper(*args, **kwargs):
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        if not user or not user.is_active or user.role != UserRole.ADMIN:
+            return jsonify({"error": "Admin access required"}), 403
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+@users_bp.route('', methods=['GET'])
+@admin_required
+def list_users():
+    users = User.query.order_by(User.created_at.desc()).all()
+    return jsonify({
+        "users": [user.to_dict() for user in users]
+    }), 200
+
 
 @users_bp.route('/me', methods=['GET'])
 @jwt_required()
@@ -22,6 +47,7 @@ def get_current_user():
         "id": user.id,
         "username": user.username,
         "email": user.email,
+        "role": user.role.value,
         "is_active": user.is_active,
     }), 200
 def send_verification_new_email(user, verification_url):
