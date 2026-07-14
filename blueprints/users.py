@@ -82,7 +82,7 @@ def list_users():
             "username": user.username,
             "email": user.email,
             "role": user.role.value if user.role else None,
-            "is_active": user.is_active,
+            "is_active": str(user.is_active),
             "created_at": user.created_at.isoformat() if user.created_at else None,
         }
         for user in users
@@ -90,9 +90,109 @@ def list_users():
 
     return jsonify({
         "success": True,
-        "users": results_list,
+        "results": results_list,
         "total_pages": pagination.pages,
     }), 200
+
+
+@users_bp.route('/<int:user_id>', methods=['GET'])
+@admin_required
+def get_user_by_id(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    return jsonify({
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role.value if user.role else None,
+        "is_active": user.is_active,
+        "is_email_verified": user.is_email_verified,
+        "pending_email": user.pending_email,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+    }), 200
+
+
+@users_bp.route('/<int:user_id>', methods=['PUT'])
+@admin_required
+def update_user_by_admin(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    if not data:
+        return jsonify({"error": "No update data provided"}), 400
+
+    if "username" in data:
+        username = data.get("username")
+        if not username or not str(username).strip():
+            return jsonify({"error": "Username cannot be empty"}), 400
+
+        normalized_username = str(username).strip()
+        existing_user = User.query.filter(
+            User.username == normalized_username,
+            User.id != user_id,
+        ).first()
+        if existing_user:
+            return jsonify({"error": "Username already exists"}), 400
+        user.username = normalized_username
+
+    if "email" in data:
+        email = data.get("email")
+        normalized_email = email.lower().strip() if email else None
+        if not normalized_email or "@" not in normalized_email:
+            return jsonify({"error": f"Invalid email address: {email!r}"}), 400
+
+        existing_user = User.query.filter(
+            (User.email == normalized_email) | (User.pending_email == normalized_email),
+            User.id != user_id,
+        ).first()
+        if existing_user:
+            return jsonify({"error": "Email already exists"}), 400
+
+        user.email = normalized_email
+        user.pending_email = None
+        user.is_email_verified = True
+
+    if "role" in data:
+        role_value = data.get("role")
+        if role_value is None:
+            return jsonify({"error": "Role cannot be null"}), 400
+
+        role_name = str(role_value).lower()
+        if role_name not in {"user", "admin"}:
+            return jsonify({"error": "Role must be either 'user' or 'admin'"}), 400
+        user.role = UserRole(role_name)
+
+    if "is_active" in data:
+        user.is_active = bool(data.get("is_active"))
+
+    db.session.commit()
+
+    return jsonify({
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role.value if user.role else None,
+        "is_active": user.is_active,
+        "is_email_verified": user.is_email_verified,
+        "pending_email": user.pending_email,
+    }), 200
+
+
+@users_bp.route('/<int:user_id>', methods=['DELETE'])
+@admin_required
+def delete_user_by_admin(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    user.is_active = False
+    db.session.commit()
+
+    return jsonify({"message": "User archived successfully."}), 200
 
 
 @users_bp.route('/me', methods=['GET'])
