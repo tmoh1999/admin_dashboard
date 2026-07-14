@@ -86,7 +86,7 @@ def list_users():
             "role": user.role.value if user.role else None,
             "is_active": str(user.is_active),
             "is_email_verified": str(user.is_email_verified),
-            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "created_at": user.created_at
         }
         for user in users
     ]
@@ -171,7 +171,7 @@ def get_user_by_id(user_id):
         "is_active": user.is_active,
         "is_email_verified": user.is_email_verified,
         "pending_email": user.pending_email,
-        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "created_at": user.created_at
     }), 200
 
 
@@ -275,6 +275,7 @@ def get_current_user():
         "email": user.email,
         "role": user.role.value,
         "is_active": user.is_active,
+        "created_at":user.created_at
     }), 200
 def send_verification_new_email(user, verification_url):
     message = Message(
