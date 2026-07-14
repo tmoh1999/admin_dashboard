@@ -40,7 +40,8 @@ def get_users_query():
                     cast(User.username, String), " ",
                     cast(User.email, String), " ",
                     cast(User.role, String), " ",
-                    cast(User.is_active, String)
+                    cast(User.is_active, String),
+                    cast(User.is_email_verified, String)
                 )
             ).like(search)
         )
@@ -52,6 +53,7 @@ def get_users_query():
         "id": User.id,
         "username": User.username,
         "email": User.email,
+        "is_email_verified": User.is_email_verified,
         "role": User.role,
         "is_active": User.is_active,
         "created_at": User.created_at,
@@ -83,6 +85,7 @@ def list_users():
             "email": user.email,
             "role": user.role.value if user.role else None,
             "is_active": str(user.is_active),
+            "is_email_verified": str(user.is_email_verified),
             "created_at": user.created_at.isoformat() if user.created_at else None,
         }
         for user in users
@@ -167,7 +170,12 @@ def update_user_by_admin(user_id):
         user.role = UserRole(role_name)
 
     if "is_active" in data:
-        user.is_active = bool(data.get("is_active"))
+        is_active = data.get("is_active")
+        if is_active is None:
+            return jsonify({"error": "is_active cannot be null"}), 400
+        if is_active.lower() not in {"true", "false"}:
+            return jsonify({"error": "is_active must be a boolean value"}), 400
+        user.is_active = is_active.lower() == "true"
 
     db.session.commit()
 
