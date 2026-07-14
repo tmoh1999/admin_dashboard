@@ -98,6 +98,64 @@ def list_users():
     }), 200
 
 
+@users_bp.route('', methods=['POST'])
+@admin_required
+def create_user_by_admin():
+    data = request.get_json(silent=True) or {}
+
+    username = (data.get("username") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password")
+    role_value = data.get("role", "user")
+    is_active_value = data.get("is_active", True)
+
+    if not username or not email or not password:
+        return jsonify({"error": "Username, email, and password are required"}), 400
+
+    if "@" not in email:
+        return jsonify({"error": f"Invalid email address: {email!r}"}), 400
+
+    existing_user = User.query.filter(
+        (User.username == username) | (User.email == email)
+    ).first()
+    if existing_user:
+        return jsonify({"error": "Username or email already exists"}), 400
+
+    if isinstance(is_active_value, str):
+        is_active_value = is_active_value.lower() in {"true", "1", "yes", "y"}
+
+    role_name = str(role_value).lower() if role_value is not None else "user"
+    if role_name not in {"user", "admin"}:
+        return jsonify({"error": "Role must be either 'user' or 'admin'"}), 400
+
+    new_user = User(
+        username=username,
+        email=email,
+        role=UserRole(role_name),
+        is_active=bool(is_active_value),
+        is_email_verified=not current_app.config["REQUEST_MAIL_VERIFICATION"],
+    )
+    try:
+        new_user.set_password(password)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({
+        "message": "User created successfully",
+        "user": {
+            "id": new_user.id,
+            "username": new_user.username,
+            "email": new_user.email,
+            "role": new_user.role.value if new_user.role else None,
+            "is_active": new_user.is_active,
+            "is_email_verified": new_user.is_email_verified,
+        }
+    }), 201
+
+
 @users_bp.route('/<int:user_id>', methods=['GET'])
 @admin_required
 def get_user_by_id(user_id):
