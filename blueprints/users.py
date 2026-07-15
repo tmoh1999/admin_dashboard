@@ -13,6 +13,12 @@ from flask_jwt_extended import (
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 
+def is_online(user):
+    if not user.last_seen:
+        return False
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    return (now - user.last_seen) <= timedelta(minutes=5)
 
 def admin_required(fn):
     @wraps(fn)
@@ -56,6 +62,8 @@ def get_users_query():
         "is_email_verified": User.is_email_verified,
         "role": User.role,
         "is_active": User.is_active,
+        "last_seen": User.last_seen,
+        "status": User.last_seen,
         "created_at": User.created_at,
     }
     column = allowed_sort_columns.get(sort_column, User.id)
@@ -86,6 +94,8 @@ def list_users():
             "role": user.role.value if user.role else None,
             "is_active": str(user.is_active),
             "is_email_verified": str(user.is_email_verified),
+            "status": "online" if is_online(user) else "offline",
+            "last_seen": user.last_seen,
             "created_at": user.created_at
         }
         for user in users
@@ -171,6 +181,8 @@ def get_user_by_id(user_id):
         "is_active": user.is_active,
         "is_email_verified": user.is_email_verified,
         "pending_email": user.pending_email,
+        "status": "online" if is_online(user) else "offline",
+        "last_seen": user.last_seen,
         "created_at": user.created_at
     }), 200
 
@@ -302,6 +314,8 @@ def get_current_user():
         "email": user.email,
         "role": user.role.value,
         "is_active": user.is_active,
+        "status": "online" if is_online(user) else "offline",
+        "last_seen": user.last_seen,
         "created_at":user.created_at
     }), 200
 def send_verification_new_email(user, verification_url):
