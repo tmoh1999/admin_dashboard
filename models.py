@@ -37,7 +37,12 @@ class User(db.Model):
     )
 
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-
+    
+    last_seen = db.Column(
+        db.DateTime(timezone=True),
+        nullable=True
+    )
+    
     created_at = db.Column(
         db.DateTime(timezone=True),
         nullable=False,
