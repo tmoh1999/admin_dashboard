@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from models import User, db
 from extensions import limiter, jwt, mail
 from flask_mail import Message
+from datetime import datetime, timezone
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -332,6 +333,8 @@ def login():
     access_token = create_access_token(identity=str(user.id))
     refresh_token = create_refresh_token(identity=str(user.id))
 
+    user.last_seen = datetime.now(timezone.utc)
+    db.session.commit()
     return jsonify({
         "message": "Login successful!",
         "access_token": access_token,
@@ -359,6 +362,16 @@ def refresh_token():
     return jsonify({
         "access_token": new_access_token
     }), 200
+
+@auth_bp.route("/heartbeat", methods=["POST"])
+@jwt_required()
+def heartbeat():
+    user = get_active_user_by_id(get_jwt_identity())
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    user.last_seen = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify(message="Heartbeat received"), 200
 
 @auth_bp.route("/test")
 @jwt_required()
