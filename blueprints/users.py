@@ -3,7 +3,7 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, current_app
 from sqlalchemy import String, cast, func
 from models import User, db, UserRole
-from extensions import mail
+from extensions import mail, validate_boolean_field
 from flask_mail import Message
 
 from flask_jwt_extended import (
@@ -228,12 +228,16 @@ def update_user_by_admin(user_id):
         user.role = UserRole(role_name)
 
     if "is_active" in data:
-        is_active = data.get("is_active")
-        if is_active is None:
-            return jsonify({"error": "is_active cannot be null"}), 400
-        if is_active.lower() not in {"true", "false"}:
-            return jsonify({"error": "is_active must be a boolean value"}), 400
-        user.is_active = is_active.lower() == "true"
+        is_valid, result = validate_boolean_field("is_active", data.get("is_active"))
+        if not is_valid:
+            return jsonify({"error": result}), 400
+        user.is_active = result
+
+    if "is_email_verified" in data:
+        is_valid, result = validate_boolean_field("is_email_verified", data.get("is_email_verified"))
+        if not is_valid:
+            return jsonify({"error": result}), 400
+        user.is_email_verified = result
 
     db.session.commit()
 
