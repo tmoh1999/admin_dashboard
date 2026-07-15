@@ -252,6 +252,29 @@ def update_user_by_admin(user_id):
     }), 200
 
 
+@users_bp.route('/<int:user_id>/set-password', methods=['POST'])
+@admin_required
+def set_user_password(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    password = data.get("password")
+
+    if not password or not str(password).strip():
+        return jsonify({"error": "Password is required"}), 400
+
+    try:
+        user.set_password(str(password))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    db.session.commit()
+
+    return jsonify({"message": "Password updated successfully"}), 200
+
+
 @users_bp.route('/<int:user_id>', methods=['DELETE'])
 @admin_required
 def delete_user_by_admin(user_id):
