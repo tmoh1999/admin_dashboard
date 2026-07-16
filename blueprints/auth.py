@@ -16,7 +16,7 @@ revoked_tokens = set()
 
 
 def get_active_user_by_id(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user or not user.is_active:
         return None
     return user

@@ -17,15 +17,18 @@ def is_online(user):
     if not user.last_seen:
         return False
     from datetime import datetime, timezone, timedelta
+    last_seen = user.last_seen
+    if last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=timezone.utc)
     now = datetime.now(timezone.utc)
-    return (now - user.last_seen) <= timedelta(minutes=5)
+    return (now - last_seen) <= timedelta(minutes=5)
 
 def admin_required(fn):
     @wraps(fn)
     @jwt_required()
     def wrapper(*args, **kwargs):
         current_user_id = get_jwt_identity()
-        user = User.query.get(current_user_id)
+        user = db.session.get(User, current_user_id)
         if not user or not user.is_active or user.role != UserRole.ADMIN:
             return jsonify({"error": "Admin access required"}), 403
         return fn(*args, **kwargs)
@@ -169,7 +172,7 @@ def create_user_by_admin():
 @users_bp.route('/<int:user_id>', methods=['GET'])
 @admin_required
 def get_user_by_id(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -190,7 +193,7 @@ def get_user_by_id(user_id):
 @users_bp.route('/<int:user_id>', methods=['PUT'])
 @admin_required
 def update_user_by_admin(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -267,7 +270,7 @@ def update_user_by_admin(user_id):
 @users_bp.route('/<int:user_id>/set-password', methods=['POST'])
 @admin_required
 def set_user_password(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -290,7 +293,7 @@ def set_user_password(user_id):
 @users_bp.route('/<int:user_id>', methods=['DELETE'])
 @admin_required
 def delete_user_by_admin(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -304,7 +307,7 @@ def delete_user_by_admin(user_id):
 @jwt_required()
 def get_current_user():
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    user = db.session.get(User, current_user_id)
     if not user or not user.is_active:
         return jsonify({"error": "User not found"}), 404
 
@@ -336,7 +339,7 @@ def send_verification_new_email(user, verification_url):
 @jwt_required()
 def edit_user():
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    user = db.session.get(User, current_user_id)
     if not user or not user.is_active:
         return jsonify({"error": "User not found"}), 404
 
@@ -407,7 +410,7 @@ def edit_user():
 @jwt_required()
 def delete_current_user():
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    user = db.session.get(User, current_user_id)
     if not user or not user.is_active:
         return jsonify({"error": "User not found"}), 404
 
