@@ -4,11 +4,12 @@ load_dotenv()
 import os
 from flask import jsonify
 from app_init import create_app
-
+from models import db
 
 
 app = create_app()
-
+with app.app_context():
+    db.create_all()
 
 @app.route("/")
 def home():
