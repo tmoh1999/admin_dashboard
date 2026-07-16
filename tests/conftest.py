@@ -7,7 +7,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("EMAIL_VERIFICATION_SALT", "test-salt")
 os.environ.setdefault("REQUEST_MAIL_VERIFICATION", "False")
 
-from app import create_app
+from app_init import create_app
 from models import db
 
 
