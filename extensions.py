@@ -3,7 +3,10 @@ from flask_limiter.util import get_remote_address
 from flask_jwt_extended import JWTManager
 from flask_mail import Mail
 from flask_migrate import Migrate
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri="memory://",
+)
 jwt = JWTManager()
 mail = Mail()
 migrate = Migrate()

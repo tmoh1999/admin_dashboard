@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-os.environ.setdefault("SECRET_KEY", "test-secret")
+os.environ.setdefault("SECRET_KEY", "test-secret-test-secret-test-secret-test-secret")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("EMAIL_VERIFICATION_SALT", "test-salt")
 os.environ.setdefault("REQUEST_MAIL_VERIFICATION", "False")
