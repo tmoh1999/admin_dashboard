@@ -155,8 +155,8 @@ def create_user_by_admin():
     if role_name not in {"user", "admin"}:
         return jsonify({"error": "Role must be either 'user' or 'admin'"}), 400
 
-    is_demo_user=is_demo_user()
-    if is_demo_user() and role_name != "user":
+    is_demo=is_demo_user()
+    if is_demo and role_name != "user":
         return jsonify({"error": "You are not allowed to create admin users in demo mode"}), 400
     
     new_user = User(
@@ -165,8 +165,8 @@ def create_user_by_admin():
         role=UserRole(role_name),
         is_active=bool(is_active_value),
         is_email_verified=not current_app.config["REQUEST_MAIL_VERIFICATION"],
-        is_demo=is_demo_user,
-        is_demo_data=True if is_demo_user else False,
+        is_demo=is_demo,
+        is_demo_data=True if is_demo else False,
     )
     try:
         new_user.set_password(password)
