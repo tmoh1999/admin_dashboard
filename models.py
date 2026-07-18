@@ -37,6 +37,10 @@ class User(db.Model):
     )
 
     is_active = db.Column(db.Boolean, nullable=False, default=True)
+
+    # Demo fields
+    is_demo = db.Column(db.Boolean, nullable=False, default=False,server_default=db.text("false"))
+    is_demo_data = db.Column(db.Boolean, nullable=False, default=False,server_default=db.text("false"))
     
     last_seen = db.Column(
         db.DateTime(timezone=True),
