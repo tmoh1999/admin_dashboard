@@ -1,7 +1,7 @@
 from functools import wraps
 
 from flask import Blueprint, request, jsonify, current_app
-from sqlalchemy import String, cast, func
+from sqlalchemy import String, cast, func,or_
 from models import User, db, UserRole
 from extensions import mail, validate_boolean_field
 from flask_mail import Message
@@ -22,7 +22,12 @@ def is_online(user):
         last_seen = last_seen.replace(tzinfo=timezone.utc)
     now = datetime.now(timezone.utc)
     return (now - last_seen) <= timedelta(minutes=5)
-
+def is_demo_user():
+    current_user_id = get_jwt_identity()
+    current_user = db.session.get(User, current_user_id)    
+    if not current_user or not current_user.is_active:
+        return False
+    return current_user.is_demo
 def admin_required(fn):
     @wraps(fn)
     @jwt_required()
@@ -37,7 +42,16 @@ def admin_required(fn):
 
 
 def get_users_query():
-    users_query = User.query
+    users_query = (
+        User.query.filter(
+            or_(
+                User.is_demo == True,
+                User.is_demo_data == True,
+            )
+        )
+        if is_demo_user()
+        else User.query
+    )
 
     query = request.args.get("search")
     if query:
@@ -141,12 +155,18 @@ def create_user_by_admin():
     if role_name not in {"user", "admin"}:
         return jsonify({"error": "Role must be either 'user' or 'admin'"}), 400
 
+    is_demo_user=is_demo_user()
+    if is_demo_user() and role_name != "user":
+        return jsonify({"error": "You are not allowed to create admin users in demo mode"}), 400
+    
     new_user = User(
         username=username,
         email=email,
         role=UserRole(role_name),
         is_active=bool(is_active_value),
         is_email_verified=not current_app.config["REQUEST_MAIL_VERIFICATION"],
+        is_demo=is_demo_user,
+        is_demo_data=True if is_demo_user else False,
     )
     try:
         new_user.set_password(password)
@@ -175,6 +195,8 @@ def get_user_by_id(user_id):
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
+    if is_demo_user() and get_jwt_identity()!= user_id and not user.is_demo_data:
+        return jsonify({"error": "You are not allowed to access this user in demo mode"}), 403
 
     return jsonify({
         "id": user.id,
@@ -196,7 +218,8 @@ def update_user_by_admin(user_id):
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
-
+    if is_demo_user() and get_jwt_identity()!= user_id and not user.is_demo_data:
+        return jsonify({"error": "You are not allowed to access this user in demo mode"}), 403
     data = request.get_json(silent=True) or {}
     if not data:
         return jsonify({"error": "No update data provided"}), 400
@@ -232,7 +255,7 @@ def update_user_by_admin(user_id):
         user.pending_email = None
         user.is_email_verified = True
 
-    if "role" in data:
+    if "role" in data and not is_demo_user():
         role_value = data.get("role")
         if role_value is None:
             return jsonify({"error": "Role cannot be null"}), 400
@@ -273,6 +296,8 @@ def set_user_password(user_id):
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
+    if is_demo_user() and get_jwt_identity()!= user_id and not user.is_demo_data:
+        return jsonify({"error": "You are not allowed to access this user in demo mode"}), 403
 
     data = request.get_json(silent=True) or {}
     password = data.get("password")
@@ -296,7 +321,8 @@ def delete_user_by_admin(user_id):
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
-
+    if is_demo_user() and get_jwt_identity()!= user_id and not user.is_demo_data:
+        return jsonify({"error": "You are not allowed to access this user in demo mode"}), 403
     user.is_active = False
     db.session.commit()
 
