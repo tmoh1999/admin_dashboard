@@ -546,7 +546,7 @@ def export_users():
             str(user.is_active),
             str(user.is_email_verified),
             "online" if is_online(user) else "offline",
-            user.last_seen.replace(tzinfo=None),
+            user.last_seen.replace(tzinfo=None) if user.last_seen else None,
             user.created_at.replace(tzinfo=None)
         ])
     # Save to in-memory file
@@ -573,8 +573,8 @@ def users_pdf():
             "is_active": str(user.is_active),
             "is_email_verified": str(user.is_email_verified),
             "status": "online" if is_online(user) else "offline",
-            "last_seen": user.last_seen,
-            "created_at": user.created_at
+            "last_seen": user.last_seen.replace(tzinfo=None) if user.last_seen else None,
+            "created_at": user.created_at.replace(tzinfo=None)
         }
         for user in users
     ]    
