@@ -1,4 +1,5 @@
 from functools import wraps
+from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, request, jsonify, current_app
 from sqlalchemy import String, cast, func,or_
@@ -16,7 +17,6 @@ users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 def is_online(user):
     if not user.last_seen:
         return False
-    from datetime import datetime, timezone, timedelta
     last_seen = user.last_seen
     if last_seen.tzinfo is None:
         last_seen = last_seen.replace(tzinfo=timezone.utc)
@@ -444,3 +444,49 @@ def delete_current_user():
     db.session.commit()
 
     return jsonify({"message": "User archived successfully."}), 200
+
+
+@users_bp.route('/stats', methods=['GET'])
+@admin_required
+def get_user_stats():
+    base_query = User.query if not is_demo_user() else User.query.filter(
+        or_(
+            User.is_demo == True,
+            User.is_demo_data == True,
+        )
+    )
+    
+    total_users = base_query.count()
+    
+    active_users = base_query.filter(User.is_active == True).count()
+    
+    inactive_users = base_query.filter(User.is_active == False).count()
+    
+    admin_count = base_query.filter(User.role == UserRole.ADMIN).count()
+    
+    user_count = base_query.filter(User.role == UserRole.USER).count()
+    
+    verified_emails = base_query.filter(User.is_email_verified == True).count()
+    
+    unverified_emails = base_query.filter(User.is_email_verified == False).count()
+    
+    online_users = sum(1 for user in base_query.all() if is_online(user))
+    
+    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    users_last_7_days = base_query.filter(User.created_at >= seven_days_ago).count()
+    
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    users_last_30_days = base_query.filter(User.created_at >= thirty_days_ago).count()
+    
+    return jsonify({
+        "total_users": total_users,
+        "active_users": active_users,
+        "inactive_users": inactive_users,
+        "admin_count": admin_count,
+        "user_count": user_count,
+        "verified_emails": verified_emails,
+        "unverified_emails": unverified_emails,
+        "online_users": online_users,
+        "users_last_7_days": users_last_7_days,
+        "users_last_30_days": users_last_30_days,
+    }), 200
