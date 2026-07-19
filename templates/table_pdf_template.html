@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Data</title>
+    
+</head>
+<body class="bg-white">
+
+
+
+    <div class="container py-4">
+    	<h2 class="mb-4">{{table_name}}</h2>
+        <div class="table-responsive shadow-sm rounded">
+            <table class="table table-striped table-hover align-middle">
+    	       <thead class="table-primary text-center">
+                    <tr>
+                        {% for col in columns %}
+                    	<th class="titles">{{col["Name"]}}</th>
+                        {% endfor %}
+                   </tr>
+               </thead>
+        <tbody class="text-center">
+        {% for row in data %}
+            {% set r=row if row is mapping else row.__dict__ %}
+            <tr>
+                {% for col in columns %}
+                    <td class="titles">{{rx}}{{r[col["accessor"]]}}</td>
+                {% endfor %}    
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+   </div>
+   </div>
+</body>
+</html>
