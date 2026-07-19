@@ -482,18 +482,22 @@ def get_user_stats():
     users_last_30_days = base_query.filter(User.created_at >= thirty_days_ago).count()
     
     # Registration chart data - daily registrations for last 30 days
-    registration_chart = []
-    for i in range(30):
-        day_start = thirty_days_ago + timedelta(days=i)
-        day_end = day_start + timedelta(days=1)
-        count = base_query.filter(
-            User.created_at >= day_start,
-            User.created_at < day_end
-        ).count()
-        registration_chart.append({
-            "date": day_start.strftime("%Y-%m-%d"),
-            "count": count
-        })
+    rows = (
+        db.session.query(
+            func.date(User.created_at).label("date"),
+            func.count(User.id).label("count")
+        )
+        .filter(
+            User.created_at >= thirty_days_ago
+        )
+        .group_by(func.date(User.created_at))
+        .all()
+    )
+    
+    registration_chart = [
+        {"date": str(row.date), "count": row.count}
+        for row in rows
+    ]
     
     return jsonify({
         "total_users": total_users,
