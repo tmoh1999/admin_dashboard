@@ -1,12 +1,15 @@
 from functools import wraps
 from datetime import datetime, timezone, timedelta
 
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app,render_template,send_file
 from sqlalchemy import String, cast, func,or_
 from models import User, db, UserRole
 from extensions import mail, validate_boolean_field
 from flask_mail import Message
-
+import os
+import io
+from weasyprint import HTML,CSS
+from openpyxl import load_workbook,Workbook
 from flask_jwt_extended import (
     get_jwt_identity,
     jwt_required,
@@ -490,3 +493,93 @@ def get_user_stats():
         "users_last_7_days": users_last_7_days,
         "users_last_30_days": users_last_30_days,
     }), 200
+
+@users_bp.route("/export/excel", methods=["GET"])
+@admin_required
+def export_users():
+    
+    # Create a new Excel workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Users"
+
+    # Write header row
+    ws.append(
+        [
+            "ID",
+            "Username",
+            "Email",
+            "Eole",
+            "Is_active",
+            "Is_email_verified",
+            "Status",
+            "Last_seen",
+            "Created_at"
+        ]
+    )
+    users = get_users_query().all()
+    for user in users:
+        ws.append([    
+            user.id,
+            user.username,
+            user.email,
+            user.role.value if user.role else None,
+            str(user.is_active),
+            str(user.is_email_verified),
+            "online" if is_online(user) else "offline",
+            user.last_seen.replace(tzinfo=None),
+            user.created_at.replace(tzinfo=None)
+        ])
+    # Save to in-memory file
+    file_stream = io.BytesIO()
+    wb.save(file_stream)
+    file_stream.seek(0)
+
+    return send_file(
+        file_stream,
+        as_attachment=True,
+        download_name="users.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+@users_bp.route("/export/pdf",methods=["GET"])
+@admin_required
+def users_pdf():
+    users = get_users_query().all()
+    results_list = [
+        {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role.value if user.role else None,
+            "is_active": str(user.is_active),
+            "is_email_verified": str(user.is_email_verified),
+            "status": "online" if is_online(user) else "offline",
+            "last_seen": user.last_seen,
+            "created_at": user.created_at
+        }
+        for user in users
+    ]    
+    columns=[
+        { "Name": "ID", "accessor": "id" },
+        { "Name": "Username", "accessor": "username" },
+        { "Name": "Email", "accessor": "email" },
+        { "Name": "IsEmailVerified", "accessor": "is_email_verified" },
+        { "Name": "Role", "accessor": "role" },
+        { "Name": "IsActive", "accessor": "is_active" },
+        { "Name": "Status", "accessor": "status" },
+        { "Name": "Last Seen", "accessor": "last_seen" },
+        { "Name": "Created At", "accessor": "created_at" },
+    ]
+
+    # render to PDF
+    html = render_template("table_pdf_template.html", data=results_list,columns=columns,table_name="Users")
+    
+    css_path = os.path.join(current_app.root_path, "static", "css","bootstrap.min.css")
+    pdf_bytes = HTML(string=html, base_url=current_app.root_path).write_pdf(stylesheets=[CSS(css_path)])
+    pdf_file = io.BytesIO(pdf_bytes)
+    return send_file(
+        pdf_file,
+        mimetype="application/pdf",
+        as_attachment=True,          # True → download, False → open in browser
+        download_name="users.pdf"  # filename for the browser
+    )	
