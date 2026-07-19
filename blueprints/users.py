@@ -481,6 +481,20 @@ def get_user_stats():
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     users_last_30_days = base_query.filter(User.created_at >= thirty_days_ago).count()
     
+    # Registration chart data - daily registrations for last 30 days
+    registration_chart = []
+    for i in range(30):
+        day_start = thirty_days_ago + timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        count = base_query.filter(
+            User.created_at >= day_start,
+            User.created_at < day_end
+        ).count()
+        registration_chart.append({
+            "date": day_start.strftime("%Y-%m-%d"),
+            "count": count
+        })
+    
     return jsonify({
         "total_users": total_users,
         "active_users": active_users,
@@ -492,6 +506,7 @@ def get_user_stats():
         "online_users": online_users,
         "users_last_7_days": users_last_7_days,
         "users_last_30_days": users_last_30_days,
+        "registration_chart": registration_chart,
     }), 200
 
 @users_bp.route("/export/excel", methods=["GET"])
